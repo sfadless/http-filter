@@ -39,7 +39,7 @@ final class DoctrineQueryBuilderAdapter extends AbstractAdapter
         $expr = $this->qb->expr();
 
         switch ($operator) {
-            case FilterFieldOperator::EQUAL: return $expr->eq($fieldName, $fieldValue);
+            case FilterFieldOperator::EQUAL: return $expr->eq($fieldName, $expr->literal("$fieldValue"));
             case FilterFieldOperator::LIKE: return $expr->like($fieldName, $expr->literal("%$fieldValue%"));
         }
 
