@@ -98,4 +98,32 @@ final class QueryHttpFilter implements HttpFilterInterface
 
         return $resolver->resolve($filter);
     }
+
+    public function buildQuery(array $params): string
+    {
+        $params = [
+            HttpFilterInterface::PAGE => $params[HttpFilterInterface::PAGE] ?? $this->page,
+            HttpFilterInterface::PER_PAGE => $this->perPage,
+        ];
+
+        if (count($this->filters) > 0) {
+            $params[HttpFilterInterface::FILTERS] = array_map(
+                fn(FilterField $filterField) => $filterField->jsonSerialize(),
+                $this->filters
+            );
+        }
+
+        return http_build_query($params);
+    }
+
+    public function getFilterValue(string $filterName): ?string
+    {
+        foreach ($this->filters as $filter) {
+            if ($filter->name === $filterName) {
+                return $filter;
+            }
+        }
+
+        return null;
+    }
 }
