@@ -120,7 +120,7 @@ final class QueryHttpFilter implements HttpFilterInterface
     {
         foreach ($this->filters as $filter) {
             if ($filter->name === $filterName) {
-                return $filter;
+                return $filter->value;
             }
         }
 
