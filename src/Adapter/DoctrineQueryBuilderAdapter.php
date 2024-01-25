@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Sfadless\HttpFilter\Adapter;
 
-use Doctrine\ORM\Query\Expr\Comparison;
 use Doctrine\ORM\QueryBuilder;
-use Exception;
-use Sfadless\HttpFilter\FilterField;
+use Sfadless\HttpFilter\Adapter\Doctrine\Exception\DuplicateOperatorHandlerException;
+use Sfadless\HttpFilter\Adapter\Doctrine\Exception\OperatorHandlerNotExistsException;
+use Sfadless\HttpFilter\Adapter\Doctrine\OperatorHandler\EqualHandler;
+use Sfadless\HttpFilter\Adapter\Doctrine\OperatorHandler\LikeHandler;
+use Sfadless\HttpFilter\Adapter\Doctrine\OperatorHandler\OperatorHandler;
 use Sfadless\HttpFilter\FilterFieldOperator;
 use Sfadless\HttpFilter\HttpFilterInterface;
 
@@ -16,17 +18,47 @@ use Sfadless\HttpFilter\HttpFilterInterface;
  */
 final class DoctrineQueryBuilderAdapter extends AbstractAdapter
 {
-    public function __construct(private readonly QueryBuilder $qb, private readonly array $fieldsMapping = []){}
+    /**
+     * @var OperatorHandler[]
+     */
+    private array $handlers;
+
+    public function __construct(
+        private readonly QueryBuilder $qb,
+
+        /**
+         * Массив вида 'field' => 'field_in_db', если название поля отличается от того, что в фильтре
+         */
+        private readonly array $fieldsMapping = []
+    ) {
+        $this->initDefaultOperatorHandlers();
+    }
+
+    public function addHandler(OperatorHandler $handler): void
+    {
+        $operatorCode = $handler->getOperator()->value;
+
+        if (isset($this->handlers[$operatorCode])) {
+            throw new DuplicateOperatorHandlerException();
+        }
+
+        $this->handlers[$operatorCode] = $handler;
+    }
 
     public function applyFilter(HttpFilterInterface $httpFilter): void
     {
         foreach ($httpFilter->getFilters() as $filterField) {
-            $queryFieldName = $this->resolveQueryFieldName($filterField->name);
-
-            $this->qb->andWhere(
-                $this->getExprForOperator($filterField->operator, $queryFieldName, $filterField->value)
-            );
+            $operatorHandler = $this->resolveHandlerForOperator($filterField->operator);
+            $operatorHandler->handle($this->qb, $this->resolveQueryFieldName($filterField->name), $filterField->value);
         }
+    }
+
+    private function initDefaultOperatorHandlers(): void
+    {
+        $this->handlers = [
+            FilterFieldOperator::EQUAL->value => new EqualHandler(),
+            FilterFieldOperator::LIKE->value => new LikeHandler(),
+        ];
     }
 
     private function resolveQueryFieldName(string $fieldName): string
@@ -34,15 +66,12 @@ final class DoctrineQueryBuilderAdapter extends AbstractAdapter
         return $this->fieldsMapping[$fieldName] ?? $this->qb->getRootAliases()[0] . '.' . $fieldName;
     }
 
-    private function getExprForOperator(FilterFieldOperator $operator, string $fieldName, mixed $fieldValue): Comparison
+    private function resolveHandlerForOperator(FilterFieldOperator $operator): OperatorHandler
     {
-        $expr = $this->qb->expr();
-
-        switch ($operator) {
-            case FilterFieldOperator::EQUAL: return $expr->eq($fieldName, $expr->literal("$fieldValue"));
-            case FilterFieldOperator::LIKE: return $expr->like($fieldName, $expr->literal("%$fieldValue%"));
+        if (! isset($this->handlers[$operator->value])) {
+            throw new OperatorHandlerNotExistsException('Operator handler for operator ' . $operator->value . ' not exists.');
         }
 
-        throw new Exception("Not implementer logic for $operator->value");
+        return $this->handlers[$operator->value];
     }
 }
