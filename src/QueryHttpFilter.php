@@ -31,11 +31,15 @@ final class QueryHttpFilter implements HttpFilterInterface
         foreach ($parsed[HttpFilterInterface::FILTERS] as $filter) {
             $validatedFilter = $this->validateFilter($filter);
 
-            $this->filters[] = new FilterField(
-                $validatedFilter[HttpFilterInterface::NAME],
-                $validatedFilter[HttpFilterInterface::VALUE],
-                FilterFieldOperator::from($validatedFilter[HttpFilterInterface::OPERATOR])
-            );
+            $providedValue = trim($validatedFilter[HttpFilterInterface::VALUE]);
+
+            if (strlen($providedValue) > 0) {
+                $this->filters[] = new FilterField(
+                    $validatedFilter[HttpFilterInterface::NAME],
+                    $validatedFilter[HttpFilterInterface::VALUE],
+                    FilterFieldOperator::from($validatedFilter[HttpFilterInterface::OPERATOR])
+                );
+            }
         }
     }
 
