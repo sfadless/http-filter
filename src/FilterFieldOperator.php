@@ -18,4 +18,6 @@ enum FilterFieldOperator: string
     case LIKE = "like";
     case JSON_FIELD_EQUAL = 'json_field_equal';
     case JSON_IN_ARRAY = 'json_in_array';
+
+    case CUSTOM = 'custom';
 }
